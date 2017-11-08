@@ -28,11 +28,9 @@
 	</style>
 </head>
 <body>
-
 	<div id="container"></div>
 
-	<div id="info">
-	camera orbit/zoom/pan with left/middle/right mouse button</div>
+	<div id="info">camera orbit/zoom/pan with left/middle/right mouse button</div>
 
 	<script src="js/three.min.js"></script>
 	<script src="js/OrbitControls.js"></script>
@@ -44,6 +42,7 @@
 	<script src="js/utils.js"></script>
 
 	<script src="js/jquery-3.2.1.min.js"></script>
+	<script src="js/math.min.js"></script>
 
 	<script>
 		var scene, camera, controls, stats;
@@ -63,115 +62,10 @@
 		renderer = new THREE.WebGLRenderer( { antialias: true } );
 		renderer.setPixelRatio( window.devicePixelRatio );
 		renderer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
+		renderer.shadowMap.enabled = true;
+		renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
 		container.appendChild( renderer.domElement );
-
-		function vectorize(vector)
-		{
-		    return new THREE.Vector3(vector[2], vector[1], vector[0]);
-		}
-
-		function cylinderMesh(pointX, pointY, material)
-		{
-			var lineMaterial = new MeshLineMaterial({
-				color: new THREE.Color('blue'),
-				sizeAttenuation: true,
-				lineWidth: 2
-			});
-			var geometry = new THREE.Geometry();
-			geometry.vertices.push(
-				pointX,
-				pointY
-			);
-
-			var line = new MeshLine();
-			line.setGeometry(geometry);
-			var mesh = new THREE.Mesh(line.geometry, lineMaterial);
-			return mesh;
-		}
-
-		function loadSubject(scene, subject)
-		{
-			var bones = {};
-		    function dfs(position, node)
-		    {
-		    	node.position = position;
-		        if ("direction" in node)
-		        {
-		            var direction = vectorize(node.direction);
-		            direction.multiplyScalar(node.length);
-		            var endPosition = new THREE.Vector3().addVectors(position, direction);
-		            // var bone = cylinderMesh(position, endPosition);
-		            // bone.name = node.name;
-		            // scene.add(bone);
-		            if (node.name != "root")
-		            {
-			            var geometry = new THREE.SphereGeometry(1, 32, 32);
-						var material = new THREE.MeshPhongMaterial( {
-							color: 0x156289,
-							emissive: 0x072534,
-							side: THREE.DoubleSide,
-							flatShading: true
-						} );
-						var sphere = new THREE.Mesh( geometry, material );
-			            sphere.name = node.name;
-			            scene.add(sphere);
-			        }
-		            for (var name in node.children)
-			        {
-			            dfs(endPosition, node.children[name]);
-			        }
-		        }
-		        else
-		        {
-			        for (var name in node.children)
-			        {
-			            dfs(position, node.children[name]);
-			        }
-			    }
-			    bones[node.name] = node;
-		    }
-
-		    dfs(new THREE.Vector3(), subject.root);
-
-		    return {
-		    	subject: subject,
-		    	bones: bones
-		    };
-		}
-
-		function loadAnimation()
-		{
-			return new Promise(function(resolve, reject)
-			{
-				$.get("mocap/animation.amc", function(amc)
-				{
-					var frames = [];
-					amc = amc.split("\n");
-					// console.log(amc);
-					var current_frame = {};
-					for (var i = 0; i < amc.length; ++i)
-					{
-						var line = amc[i].trim();
-						if (line.startsWith('root'))
-						{
-				            if (!jQuery.isEmptyObject(current_frame))
-				                frames.push(current_frame);
-				            current_frame = {};
-				        }
-				        var split = line.split(' ');
-				        if (split.length <= 1)
-				            continue;
-				        current_frame[split[0]] = [];
-				        for (var j = 1; j < split.length; ++j)
-				        	current_frame[split[0]].push(parseFloat(split[j]));
-					}
-				    if (!jQuery.isEmptyObject(current_frame))
-				        frames.push(current_frame);
-
-					resolve(frames);
-				});
-			});
-		}
 
 		$.getJSON("mocap/subject.json", function(subject)
 		{
@@ -179,18 +73,37 @@
 		    scene.background = new THREE.Color(0xffffff);
 
 		    camera = new THREE.PerspectiveCamera(30, SCREEN_WIDTH / SCREEN_HEIGHT, 1, 10000);
-			camera.position.set(-200, 0, 200);
+			camera.position.set(-200, 50, 200);
 
 			controls = new THREE.OrbitControls( camera );
 
 			var lights = [];
 			lights[ 0 ] = new THREE.PointLight( 0xffffff, 1, 0 );
-			lights[ 1 ] = new THREE.PointLight( 0xffffff, 1, 0 );
-			lights[ 2 ] = new THREE.PointLight( 0xffffff, 1, 0 );
+			lights[ 1 ] = new THREE.PointLight( 0xffffff, 0.1, 0 );
+			lights[ 2 ] = new THREE.PointLight( 0xffffff, 0.1, 0 );
 
 			lights[ 0 ].position.set( 0, 200, 0 );
 			lights[ 1 ].position.set( 100, 200, 100 );
 			lights[ 2 ].position.set( - 100, - 200, - 100 );
+
+			lights[ 0 ].castShadow = true;
+			lights[ 1 ].castShadow = true;
+			lights[ 2 ].castShadow = true;
+
+			lights[ 0 ].shadow.mapSize.width = 1024;  
+			lights[ 0 ].shadow.mapSize.height = 1024; 
+			lights[ 0 ].shadow.camera.near = 2;       
+			lights[ 0 ].shadow.camera.far = 500;
+
+			lights[ 1 ].shadow.mapSize.width = 1024;  
+			lights[ 1 ].shadow.mapSize.height = 1024; 
+			lights[ 1 ].shadow.camera.near = 2;       
+			lights[ 1 ].shadow.camera.far = 500;
+
+			lights[ 2 ].shadow.mapSize.width = 1024;  
+			lights[ 2 ].shadow.mapSize.height = 1024; 
+			lights[ 2 ].shadow.camera.near = 2;       
+			lights[ 2 ].shadow.camera.far = 500;
 
 			scene.add( lights[ 0 ] );
 			scene.add( lights[ 1 ] );
@@ -200,11 +113,18 @@
 			var geometry = new THREE.PlaneBufferGeometry(20000, 20000);
 			var material = new THREE.MeshPhongMaterial({ shininess: 0.1 });
 			var ground = new THREE.Mesh(geometry, material);
-
-			ground.position.set(0, -250, 0);
+			ground.position.set(0, -50, 0);
 			ground.rotation.x = -Math.PI / 2;
+			scene.add(ground);
 
-			scene.add( ground );
+			// smaller plane that only renders shadows
+			var shadowGeometry = new THREE.PlaneBufferGeometry(200, 200);
+			var shadowGround = new THREE.Mesh(shadowGeometry, new THREE.ShadowMaterial({opacity: 0.5}));
+			shadowGround.position.set(0, 1, 0);
+			shadowGround.rotation.x = -Math.PI / 2;
+            shadowGround.castShadow = false;
+            shadowGround.receiveShadow = true;
+			scene.add(shadowGround);
 
 			scene.fog = new THREE.Fog(0xffffff, 1000, 10000);
 
@@ -213,14 +133,11 @@
 			var lr = loadSubject(scene, subject);
 			subject = lr.subject;
 			bones = lr.bones;
-			// scene.add(cylinderMesh(new THREE.Vector3(0, 0, 0), new THREE.Vector3(40, 40, 40), material));
 
 			var light = new THREE.AmbientLight(0x404040); // soft white light
 			scene.add(light);
 
-			// Initialization of the loaded animations
-
-			// var animationClip = scene.animations[ 0 ];
+			// generate keyframes to play back AMC animation
 			mixer = new THREE.AnimationMixer(scene);
 
 			loadAnimation().then(function(frames)
@@ -233,80 +150,56 @@
 				{
 					times.push(i/100.);
 					var frame = frames[i];
-					// for (var jointName in frames[i])
-					// {
-					// 	var position = bones[jointName].position;
-					// 	// positions[jointName].push(position.x+frames[i]["root"][2]);
-					// 	// positions[jointName].push(position.y+frames[i]["root"][1]);
-					// 	// positions[jointName].push(position.z+frames[i]["root"][0]);
-					// }
 
-					function dfs(position, orientation, node)
+					// compute local bone transformation
+					// given parent position, current joint, and stack of rotation matrices
+					function dfs(position, node, stack)
 				    {
-			    //         if (node.name != "root")
-				   //  	{
-				   //  		positions[node.name].push(position.x);
-							// positions[node.name].push(position.y);
-							// positions[node.name].push(position.z);
-				   //  	}
-				    	
-				        if ("direction" in node)
+					    var angles = [0, 0, 0];
+					    var direction = [0, 0, 0];
+				   		if ("direction" in node)
 				        {
-				            var direction = vectorize(node.direction);
-				            direction.multiplyScalar(node.length);
+				            direction = math.multiply(node.direction, node.length);
 
 				            if ("axis" in node && node.name in frame)
 				            {
-					            var axisEuler = new THREE.Euler(
-					            	node.axis[2] * Math.PI / 180.,
-					            	node.axis[0] * Math.PI / 180.,
-					            	node.axis[1] * Math.PI / 180.,
-					            	'XYZ');
-					            var axis = new THREE.Quaternion();
-					            axis.setFromEuler(axisEuler);
 					            var dofs = ["rx", "ry", "rz"];
-					            var angles = [0, 0, 0];
 					            for (var d = 0; d < node.dof.length; ++d)
 					            {
 					            	var dof = node.dof[d];
-					            	angles[dofs.indexOf(dof)] = frame[node.name][d] * Math.PI / 180.;
+					            	angles[dofs.indexOf(dof)] = frame[node.name][d];
 					            }
-					            var jointRotation = new THREE.Quaternion();
-					            var jointEuler = new THREE.Euler(angles[0], angles[1], angles[2], 'XYZ');
-					            jointRotation.setFromEuler(jointEuler);
-					            // axis.multiply(jointRotation);
-					            var rotation = new THREE.Quaternion();
-					            rotation.multiplyQuaternions(axis, jointRotation);
-					            direction.applyQuaternion(rotation);
-					        }
-
-				            var endPosition = new THREE.Vector3().addVectors(position, direction);
-
-				            if (node.name != "root")
-					    	{
-					    		positions[node.name].push(endPosition.x);
-								positions[node.name].push(endPosition.y);
-								positions[node.name].push(endPosition.z);
-					    	}
-
-				            for (var name in node.children)
-					        {
-					            dfs(endPosition, orientation, node.children[name]);
-					        }
-				        }
-				        else
-				        {
-					        for (var name in node.children)
-					        {
-					            dfs(position, orientation, node.children[name]);
 					        }
 					    }
+
+			            var L = rotation_matrix(node, angles[0], angles[1], angles[2]);
+			            stack.push(math.multiply(L, stack[stack.length-1]));
+
+			            var d = math.multiply(direction, stack[stack.length-1]).toArray();
+			            direction = new THREE.Vector3(d[0], d[1], d[2]);
+
+			            var endPosition = new THREE.Vector3().addVectors(position, direction);
+
+			            if (node.name != "root")
+				    	{
+				    		positions[node.name].push(endPosition.x);
+							positions[node.name].push(endPosition.y);
+							positions[node.name].push(endPosition.z);
+				    	}
+
+			            for (var name in node.children)
+				        {
+				            dfs(endPosition, node.children[name], stack);
+				        }
+
 					    bones[node.name] = node;
+					    stack.pop();
 				    }
 
-			   		dfs(vectorize(frame["root"].splice(0,3)),
-			   			new THREE.Euler(0, 0, 0),
-			   			subject.root);
+			  		var root_matrix = rotation_matrix(bones.root, frame.root[3], frame.root[4], frame.root[5]);
+			   		dfs(vectorize(frame["root"].slice(0,3)),
+			   			subject.root,
+			   			[root_matrix]);
 				}
 
 				var tracks = [];
@@ -323,20 +216,6 @@
 
 				var animationClip = new THREE.AnimationClip("default", 0, tracks);
 
-				// var animationClip = new THREE.AnimationClip("default", 0,
-			 //        [
-				//         new THREE.VectorKeyframeTrack(
-				//         	"lfoot.position",
-				//         	[0, 1, 2, 3, 4, 5],
-				//         	[
-				// 	        	0,0,0,
-				// 	        	1,0,0,
-				// 	        	2,0,0,
-				// 	        	3,0,0,
-				// 	        	4,0,0,
-				// 	        	5,0,0
-				//         	])
-			 //        ]);
 				animationClip.resetDuration();
 
 				mixer.clipAction( animationClip ).play();
@@ -344,63 +223,6 @@
 				animate();
 			});			
 		});
-
-
-		// Load a scene with objects, lights and camera from a JSON file
-
-		// new THREE.ObjectLoader().load( url, function ( loadedScene ) {
-
-		// 	scene = loadedScene;
-		// 	scene.background = new THREE.Color( 0xffffff );
-
-		// 	// If the loaded file contains a perspective camera, use it with adjusted aspect ratio...
-
-		// 	scene.traverse( function ( sceneChild ) {
-
-		// 		if ( sceneChild.type === 'PerspectiveCamera' ) {
-
-		// 			camera = sceneChild;
-		// 			camera.aspect = SCREEN_WIDTH / SCREEN_HEIGHT;
-		// 			camera.updateProjectionMatrix();
-
-		// 		}
-
-		// 	} );
-
-		// 	// ... else create a new camera and use it in the loaded scene
-
-		// 	if ( camera === undefined ) {
-
-		// 		camera = new THREE.PerspectiveCamera( 30, SCREEN_WIDTH / SCREEN_HEIGHT, 1, 10000 );
-		// 		camera.position.set( - 200, 0, 200 );
-
-		// 	}
-
-		// 	controls = new THREE.OrbitControls( camera );
-
-		// 	// Ground plane and fog: examples for applying additional children and new property values to the loaded scene
-
-		// 	var geometry = new THREE.PlaneBufferGeometry( 20000, 20000 );
-		// 	var material = new THREE.MeshPhongMaterial( { shininess: 0.1 } );
-		// 	var ground = new THREE.Mesh( geometry, material );
-
-		// 	ground.position.set( 0, - 250, 0 );
-		// 	ground.rotation.x = - Math.PI / 2;
-
-		// 	scene.add( ground );
-
-		// 	scene.fog = new THREE.Fog( 0xffffff, 1000, 10000 );
-
-		// 	// Initialization of the loaded animations
-
-		// 	var animationClip = scene.animations[ 0 ];
-		// 	mixer = new THREE.AnimationMixer( scene );
-		// 	mixer.clipAction( animationClip ).play();
-
-		// 	animate();
-
-		// } );
-
 
 		window.onresize = function()
 		{
