@@ -68,7 +68,10 @@ function loadAnimation()
 			amc = amc.split("\n");
 			// console.log(amc);
 			var current_frame = {};
-			for (var i = 0; i < amc.length; ++i)
+			var i = 0;
+			while (amc[i].trim()[0] == ':' || amc[i].trim()[0] == '#')
+				++i;
+			for ( ; i < amc.length; ++i)
 			{
 				var line = amc[i].trim();
 				if (line.startsWith('root'))
