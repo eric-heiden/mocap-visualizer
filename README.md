@@ -1,7 +1,7 @@
 # mocap-visualizer
 Visualize motion capture data in JavaScript.
 
-**[View Demo](http://eric-heiden.com/mocap-visualizer/)**
+**[View Demo](https://eric-heiden.github.io/mocap-visualizer/)**
 
 ## Publish
 A primitive way to see the visualization is by issuing
